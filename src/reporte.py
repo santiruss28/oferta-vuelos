@@ -36,6 +36,7 @@ ESTADO = {
     "OPORTUNIDAD": {"fondo": "#fff3e0", "borde": "#d9730d", "texto": "#8a4700"},
     "ATENCION": {"fondo": "#fdf8e1", "borde": "#b8930a", "texto": "#6b5500"},
 }
+FILAS_POR_RUTA = 3  # tarifas por ruta en la tabla de la semana (más las resaltadas)
 FLECHA = {"sube": "▲ sube", "baja": "▼ baja", "estable": "▬ estable",
           "sin historia": "· sin historia", "sin datos": "–"}
 
@@ -161,9 +162,16 @@ def _contexto_html(ctx: dict | None) -> str:
 
 def tabla_fechadas_semana(obs, sem, rutas_cfg, cfg) -> str:
     fact = cfg["reglas"]["r3_oportunidad"]["factor_umbral"]
-    d = obs[(obs["semana_iso"] == sem) & (obs["serie"] == "fechada")].sort_values("precio_total_usd")
-    if d.empty:
+    todas = obs[(obs["semana_iso"] == sem) & (obs["serie"] == "fechada")].sort_values("precio_total_usd")
+    if todas.empty:
         return _nota("No hubo tarifas fechadas esta semana.")
+    # Las N más baratas de cada ruta, más cualquier tarifa resaltada (COMPRAR/OPORTUNIDAD).
+    resaltada = todas.apply(lambda r: estado_precio(r["precio_total_usd"],
+                                                    cfg["umbrales_usd"][r["ruta"]], fact) is not None,
+                            axis=1)
+    top = todas.groupby("ruta", sort=False).cumcount() < FILAS_POR_RUTA
+    d = todas[top | resaltada]
+    omitidas = len(todas) - len(d)
     filas = []
     for r in d.itertuples():
         umbral = cfg["umbrales_usd"][r.ruta]
@@ -185,8 +193,12 @@ def tabla_fechadas_semana(obs, sem, rutas_cfg, cfg) -> str:
             _td(vs, "right", fondo),
             _td(fuente, extra=fondo),
         ]) + "</tr>")
-    return _tabla([("Ruta", "left"), ("Fechas", "left"), ("Días", "right"), ("Aerolínea", "left"),
-                   ("Total", "right"), ("vs umbral", "right"), ("Fuente", "left")], filas)
+    tabla = _tabla([("Ruta", "left"), ("Fechas", "left"), ("Días", "right"), ("Aerolínea", "left"),
+                    ("Total", "right"), ("vs umbral", "right"), ("Fuente", "left")], filas)
+    if omitidas:
+        tabla += _nota(f"Se muestran las {FILAS_POR_RUTA} más baratas de cada ruta y las resaltadas; "
+                       f"{omitidas} tarifa(s) más de esta semana quedan en data/observaciones.csv.")
+    return tabla
 
 
 def tabla_control(tabla, serie, rutas_cfg, cfg, banda) -> str:
@@ -292,8 +304,17 @@ def armar_html(d: dict, prueba: bool = False) -> str:
                             "webhook y el envío de mails funcionan."))
 
     destacadas = [a for a in alertas if a["nivel"] in ("COMPRAR", "OPORTUNIDAD")]
+    principales, resto = [], []
+    for a in destacadas:  # ya vienen ordenadas por nivel y precio: la primera de cada ruta
+        (resto if any(p["ruta"] == a["ruta"] for p in principales) else principales).append(a)
     if destacadas:
-        partes += [bloque_destacado(a, rutas_cfg, contexto_de(a, d)) for a in destacadas]
+        partes += [bloque_destacado(a, rutas_cfg, contexto_de(a, d)) for a in principales]
+        if resto:
+            items = "".join(f'<li style="margin:2px 0">{_chip(a["nivel"])} {_e(a["mensaje"])}</li>'
+                            for a in resto)
+            partes.append(f'<p style="font-size:13px;font-weight:700;margin:8px 0 2px">Otras tarifas '
+                          f'destacadas</p><ul style="font-size:13px;margin:0 0 12px;'
+                          f'padding-left:18px">{items}</ul>')
     else:
         partes.append(_nota("<b>Esta semana no hay tarifas para COMPRAR ni OPORTUNIDADES.</b>"))
     vigentes = [a for a in d["res"].get("suprimidas", []) if a["nivel"] in ("COMPRAR", "OPORTUNIDAD")]
