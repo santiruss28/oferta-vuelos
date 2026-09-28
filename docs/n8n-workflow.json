@@ -1,0 +1,65 @@
+{
+  "name": "Vuelos BUE → Europa: mail semanal",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "vuelos-bue-europa",
+        "authentication": "headerAuth",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "5b0f6f0e-1d1a-4c43-9d53-0a1f1c1e0a01",
+      "name": "Webhook oferta-vuelos",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 0],
+      "webhookId": "fbc444c4-97a0-40d3-b8f0-6a5310c4908c"
+    },
+    {
+      "parameters": {
+        "sendTo": "CAMBIAR@tu-mail.com",
+        "subject": "={{ $json.body.asunto }}",
+        "emailType": "html",
+        "message": "={{ $json.body.html }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "id": "5b0f6f0e-1d1a-4c43-9d53-0a1f1c1e0a02",
+      "name": "Enviar mail (Gmail)",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [280, 0]
+    },
+    {
+      "parameters": {
+        "content": "## Mail semanal de oferta-vuelos\n\n1. **Webhook**: en *Credential for Header Auth* creá una credencial con **Name** `X-Webhook-Token` y **Value** = el mismo token que `N8N_WEBHOOK_TOKEN`.\n2. **Gmail**: conectá tu cuenta y cambiá `sendTo` por tu mail.\n3. Activá el workflow y copiá la **Production URL** del Webhook en `N8N_WEBHOOK_URL`.\n4. Probá con `python src/notificar.py --prueba`.\n\nEl asunto y el HTML vienen armados desde Python: este flujo sólo los reenvía.",
+        "height": 300,
+        "width": 420
+      },
+      "id": "5b0f6f0e-1d1a-4c43-9d53-0a1f1c1e0a03",
+      "name": "Nota",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-60, -340]
+    }
+  ],
+  "connections": {
+    "Webhook oferta-vuelos": {
+      "main": [
+        [
+          {
+            "node": "Enviar mail (Gmail)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {}
+}

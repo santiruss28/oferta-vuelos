@@ -228,6 +228,9 @@ variables de entorno), nunca en el repo ni en el prompt. Para pruebas locales po
 
 ### Workflow de n8n sugerido
 
+Listo para importar: [`docs/n8n-workflow.json`](docs/n8n-workflow.json) (en n8n: *Workflows →
+Import from File*). Después de importarlo, asigná las dos credenciales y tu mail.
+
 1. **Webhook** — método `POST`, path `vuelos-bue-europa`, *Authentication: Header Auth* con
    nombre `X-Webhook-Token` y el mismo valor que `N8N_WEBHOOK_TOKEN`. *Respond: Immediately*
    (así el script recibe 200 aunque el mail tarde).
