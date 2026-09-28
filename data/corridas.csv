@@ -1,0 +1,10 @@
+fecha,semana_iso,estado,rutas_con_datos,rutas_sin_datos,fuentes_caidas,filas_agregadas,filas_rechazadas,notas
+2026-08-06,2026-W32,importada,PAR;ROM;MIL;MAD,BCN,,5,0,carga inicial desde historial-precios-consolidado.xlsx
+2026-08-07,2026-W32,importada,PAR;ROM;MIL;MAD,BCN,,5,0,carga inicial desde historial-precios-consolidado.xlsx
+2026-08-10,2026-W33,faltante,,PAR;ROM;MIL;MAD;BCN,,0,0,semana sin búsqueda en el historial
+2026-08-22,2026-W34,importada,PAR;ROM;MIL;MAD;BCN,,,5,0,carga inicial desde historial-precios-consolidado.xlsx
+2026-08-29,2026-W35,importada,PAR;ROM;MIL;MAD;BCN,,,5,0,carga inicial desde historial-precios-consolidado.xlsx
+2026-09-04,2026-W36,importada,PAR;ROM;MIL,MAD;BCN,,5,0,carga inicial desde historial-precios-consolidado.xlsx
+2026-09-07,2026-W37,faltante,,PAR;ROM;MIL;MAD;BCN,,0,0,semana sin búsqueda en el historial
+2026-09-18,2026-W38,importada,PAR;ROM;MIL;MAD;BCN,,,5,0,carga inicial desde historial-precios-consolidado.xlsx
+2026-09-27,2026-W39,importada,PAR;ROM;MIL;MAD,BCN,,5,0,carga inicial desde historial-precios-consolidado.xlsx

@@ -1,0 +1,58 @@
+{
+  "fecha_busqueda": "2026-10-05",
+  "fx": {
+    "valor": 1480.0,
+    "metodo": "oficial BNA vendedor",
+    "fuente": "https://www.bna.com.ar/Personas"
+  },
+  "fuentes_caidas": [
+    {"fuente": "Skyscanner", "detalle": "captcha / bloqueo"}
+  ],
+  "notas": "",
+  "observaciones": [
+    {
+      "ruta": "PAR",
+      "serie": "indice",
+      "fecha_ida": "2027-02-01",
+      "precio_moneda_original": 1400000,
+      "moneda": "ARS",
+      "fuente": "Turismocity",
+      "url": "https://www.turismocity.com.ar/vuelos-baratos-a-PAR-paris",
+      "evidencia": "Febrero 2027 · desde $ 1.400.000",
+      "notas": "precio desde del mes de febrero"
+    },
+    {
+      "ruta": "PAR",
+      "serie": "fechada",
+      "origen": "EZE",
+      "destino": "CDG",
+      "aerolinea": "Air France",
+      "escalas": 0,
+      "fecha_ida": "2027-03-03",
+      "fecha_vuelta": "2027-03-17",
+      "precio_moneda_original": 780,
+      "moneda": "USD",
+      "incluye_valija": "no",
+      "fuente": "Google Flights",
+      "url": "https://www.google.com/travel/flights?...",
+      "evidencia": "mié, 3 mar – mié, 17 mar · Air France · Directo · 13 h 20 min · US$780 ida y vuelta",
+      "notas": "tarifa Light, sin valija despachada"
+    },
+    {
+      "ruta": "MAD",
+      "serie": "fechada",
+      "origen": "EZE",
+      "destino": "MAD",
+      "aerolinea": "Iberia",
+      "escalas": 0,
+      "fecha_ida": "2027-02-11",
+      "fecha_vuelta": "2027-02-25",
+      "precio_moneda_original": 690,
+      "moneda": "USD",
+      "incluye_valija": "si",
+      "fuente": "Kayak",
+      "url": "https://www.kayak.com.ar/...",
+      "evidencia": "jue 11/2 – jue 25/2 · Iberia · directo · 1 valija · USD 690"
+    }
+  ]
+}

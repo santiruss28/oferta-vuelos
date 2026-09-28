@@ -1,0 +1,72 @@
+# Umbrales del sistema de alertas. Todos editables.
+# Niveles: COMPRAR > OPORTUNIDAD > ATENCION > INFO.
+# Sólo la serie "fechada" puede disparar COMPRAR/OPORTUNIDAD; la serie "indice" nunca.
+# Las filas importadas sin evidencia cuentan para el historial pero no disparan alertas.
+
+# Umbral fijo por ruta sobre precio_total_usd (con valija; MAD/BCN incluyen la conexión low-cost).
+umbrales_usd:
+  PAR: 800
+  ROM: 850
+  MIL: 850
+  MAD: 850
+  BCN: 850
+
+# Mejor tarifa real vista hasta ahora: la referencia a superar (sólo informativa en el reporte).
+mejor_tarifa_vista:
+  ruta: PAR
+  precio_usd: 726
+  aerolinea: Air France
+  fecha_ida: "2027-04-24"
+  fecha_vuelta: "2027-05-08"
+  fecha_busqueda: "2026-08-07"
+
+control:
+  k_sigma: 2
+  # Semanas mínimas para usar μ ± k·σ; antes se muestran la banda de referencia y los umbrales fijos.
+  min_semanas_limites: 6
+  ventana_media_movil: 4
+
+reglas:
+  # 1. COMPRAR: fechada <= umbral fijo de la ruta.
+  r1_umbral:
+    activa: true
+  # 2. COMPRAR: fechada que es nuevo mínimo histórico de la ruta y está bajo el LCL.
+  r2_minimo_bajo_lcl:
+    activa: true
+    min_semanas: 6
+  # 3. OPORTUNIDAD: fechada <= umbral × factor, o <= percentil de fechadas de la ruta.
+  r3_oportunidad:
+    activa: true
+    factor_umbral: 1.08
+    percentil: 20
+    min_semanas_percentil: 4
+  # 4. OPORTUNIDAD: alternativa cuyo total queda >= X USD por debajo de la mejor fechada principal de la semana.
+  r4_alternativa:
+    activa: true
+    ahorro_minimo_usd: 60
+  # 5. ATENCION: índice baja N semanas seguidas, o sube > X% vs su media de las 4 semanas previas.
+  r5_indice:
+    activa: true
+    semanas_baja: 3
+    suba_pct: 10
+    ventana_media: 4
+  # 6. ATENCION: faltan <= N días para la ida más temprana relevante y el índice viene subiendo.
+  r6_ventana:
+    activa: true
+    dias_para_ida: 120
+  # 7. INFO: ruta sin datos, fuente caída, filas rechazadas, semanas faltantes.
+  r7_info:
+    activa: true
+
+antispam:
+  # No repetir la misma alerta (ruta + regla + fechas) dentro de N días,
+  # salvo que el precio haya bajado al menos este porcentaje.
+  dias: 14
+  baja_minima_pct: 3
+  # INFO no se filtra: se muestra al pie de cada mail semanal.
+  niveles: [COMPRAR, OPORTUNIDAD, ATENCION]
+
+notificaciones:
+  # Un mail semanal por corrida (el HTML lo arma src/reporte.py; n8n sólo lo envía).
+  timeout_s: 15
+  reintentos_s: [2, 5, 10]

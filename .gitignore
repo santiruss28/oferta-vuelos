@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+venv/
+# Secretos: N8N_WEBHOOK_URL y N8N_WEBHOOK_TOKEN viven en el entorno, nunca en el repo.
+.env
+.env.*
+!.env.example
+~$*.xlsx
