@@ -33,6 +33,8 @@ def main(argv=None) -> int:
     p.add_argument("--fecha", help="AAAA-MM-DD (default: la del JSON o hoy)")
     p.add_argument("--sin-notificar", action="store_true", help="no hace ningún POST")
     p.add_argument("--vista-previa", type=Path, help="guarda el HTML del mail en este archivo")
+    p.add_argument("--forzar-mail", action="store_true",
+                   help="manda el mail aunque ya se haya mandado uno para esta fecha")
     a = p.parse_args(argv)
 
     entrada = json.loads(a.entrada.read_text(encoding="utf-8")) if a.entrada else None
@@ -57,7 +59,7 @@ def main(argv=None) -> int:
         print(f"   [{al['nivel']}] {al['mensaje']}")
 
     if not a.sin_notificar:
-        print("4. Mail semanal:", notificar.notificar_corrida(fecha))
+        print("4. Mail semanal:", notificar.notificar_corrida(fecha, forzar=a.forzar_mail))
     if a.vista_previa:
         a.vista_previa.write_text(reporte.generar(fecha)["html"], encoding="utf-8")
         print(f"   Vista previa: {a.vista_previa}")

@@ -36,6 +36,7 @@ ESTADO = {
     "OPORTUNIDAD": {"fondo": "#fff3e0", "borde": "#d9730d", "texto": "#8a4700"},
     "ATENCION": {"fondo": "#fdf8e1", "borde": "#b8930a", "texto": "#6b5500"},
 }
+FILAS_POR_RUTA = 3  # tarifas por ruta en la tabla de la semana (más las resaltadas)
 FLECHA = {"sube": "▲ sube", "baja": "▼ baja", "estable": "▬ estable",
           "sin historia": "· sin historia", "sin datos": "–"}
 
@@ -161,9 +162,16 @@ def _contexto_html(ctx: dict | None) -> str:
 
 def tabla_fechadas_semana(obs, sem, rutas_cfg, cfg) -> str:
     fact = cfg["reglas"]["r3_oportunidad"]["factor_umbral"]
-    d = obs[(obs["semana_iso"] == sem) & (obs["serie"] == "fechada")].sort_values("precio_total_usd")
-    if d.empty:
+    todas = obs[(obs["semana_iso"] == sem) & (obs["serie"] == "fechada")].sort_values("precio_total_usd")
+    if todas.empty:
         return _nota("No hubo tarifas fechadas esta semana.")
+    # Las N más baratas de cada ruta, más cualquier tarifa resaltada (COMPRAR/OPORTUNIDAD).
+    resaltada = todas.apply(lambda r: estado_precio(r["precio_total_usd"],
+                                                    cfg["umbrales_usd"][r["ruta"]], fact) is not None,
+                            axis=1)
+    top = todas.groupby("ruta", sort=False).cumcount() < FILAS_POR_RUTA
+    d = todas[top | resaltada]
+    omitidas = len(todas) - len(d)
     filas = []
     for r in d.itertuples():
         umbral = cfg["umbrales_usd"][r.ruta]
@@ -185,8 +193,12 @@ def tabla_fechadas_semana(obs, sem, rutas_cfg, cfg) -> str:
             _td(vs, "right", fondo),
             _td(fuente, extra=fondo),
         ]) + "</tr>")
-    return _tabla([("Ruta", "left"), ("Fechas", "left"), ("Días", "right"), ("Aerolínea", "left"),
-                   ("Total", "right"), ("vs umbral", "right"), ("Fuente", "left")], filas)
+    tabla = _tabla([("Ruta", "left"), ("Fechas", "left"), ("Días", "right"), ("Aerolínea", "left"),
+                    ("Total", "right"), ("vs umbral", "right"), ("Fuente", "left")], filas)
+    if omitidas:
+        tabla += _nota(f"Se muestran las {FILAS_POR_RUTA} más baratas de cada ruta y las resaltadas; "
+                       f"{omitidas} tarifa(s) más de esta semana quedan en data/observaciones.csv.")
+    return tabla
 
 
 def tabla_control(tabla, serie, rutas_cfg, cfg, banda) -> str:
@@ -236,8 +248,9 @@ def datos(fecha: date, data_dir: Path = DATA, reports_dir: Path = REPORTS,
           config_dir: Path | None = None) -> dict:
     """Carga todo lo necesario para el mail."""
     rutas_cfg, cfg = cargar_rutas(config_dir), cargar_alertas_cfg(config_dir)
-    obs = leer_observaciones(data_dir / OBSERVACIONES.name)
-    corridas = leer_csv(data_dir / CORRIDAS.name, COLUMNAS_CORRIDAS)
+    obs = control.vigentes(leer_observaciones(data_dir / OBSERVACIONES.name), rutas_cfg)
+    corridas = control.corridas_vigentes(leer_csv(data_dir / CORRIDAS.name, COLUMNAS_CORRIDAS),
+                                         rutas_cfg)
     fx = leer_csv(data_dir / FX.name, COLUMNAS_FX).sort_values("fecha")
     semanas = control.rango_de(obs, fecha, corridas)
     res_path = reports_dir / f"alertas_{fecha.isoformat()}.json"
@@ -248,6 +261,23 @@ def datos(fecha: date, data_dir: Path = DATA, reports_dir: Path = REPORTS,
         "sin_datos": control.semanas_sin_datos(obs, semanas, corridas),
         "res": json.loads(res_path.read_text(encoding="utf-8")) if res_path.exists() else {},
     }
+
+
+MESES_CORTOS = ("ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic")
+
+
+def _viaje_txt(rutas_cfg: dict) -> str:
+    v = rutas_cfg["viaje"]
+    txt = f"{v['estadia_ideal_dias']} días (se aceptan {v['estadia_min_dias']}–{v['estadia_max_dias']})"
+    if v.get("salida_hasta"):
+        return f"{txt}, ida entre el {fmt_fecha(v['salida_desde'])} y el {fmt_fecha(v['salida_hasta'])}"
+    return f"{txt}, salida desde el {fmt_fecha(v['salida_desde'])}"
+
+
+def _indice_txt(rutas_cfg: dict) -> str:
+    fuentes = sorted({r["fuente_indice"] for r in rutas_cfg["rutas"].values()})
+    meses = [f"{MESES_CORTOS[int(m[5:]) - 1]} {m[:4]}" for m in rutas_cfg["viaje"].get("meses_indice", [])]
+    return f"{' / '.join(fuentes)}, {'–'.join(meses)}"
 
 
 def contexto_de(a: dict, d: dict) -> dict:
@@ -266,7 +296,7 @@ def armar_html(d: dict, prueba: bool = False) -> str:
         f'<div style="font-family:Arial,Helvetica,sans-serif;color:{TEXTO};max-width:760px">',
         f'<h1 style="font-size:20px;margin:0 0 2px">Vuelos BUE → Europa · {fmt_fecha(fecha)}</h1>',
         _nota(f"Semana {sem}. Ida y vuelta EZE/AEP → París, Roma, Milán (o Madrid/Barcelona + "
-              "low-cost), 13–16 días, salida desde el 01/02/2027. Precios por persona; el "
+              f"low-cost), {_viaje_txt(rutas_cfg)}. Precios por persona; el "
               "<b>total</b> incluye valija (real o estimada) y, en alternativas, la conexión."),
     ]
     if prueba:
@@ -274,8 +304,17 @@ def armar_html(d: dict, prueba: bool = False) -> str:
                             "webhook y el envío de mails funcionan."))
 
     destacadas = [a for a in alertas if a["nivel"] in ("COMPRAR", "OPORTUNIDAD")]
+    principales, resto = [], []
+    for a in destacadas:  # ya vienen ordenadas por nivel y precio: la primera de cada ruta
+        (resto if any(p["ruta"] == a["ruta"] for p in principales) else principales).append(a)
     if destacadas:
-        partes += [bloque_destacado(a, rutas_cfg, contexto_de(a, d)) for a in destacadas]
+        partes += [bloque_destacado(a, rutas_cfg, contexto_de(a, d)) for a in principales]
+        if resto:
+            items = "".join(f'<li style="margin:2px 0">{_chip(a["nivel"])} {_e(a["mensaje"])}</li>'
+                            for a in resto)
+            partes.append(f'<p style="font-size:13px;font-weight:700;margin:8px 0 2px">Otras tarifas '
+                          f'destacadas</p><ul style="font-size:13px;margin:0 0 12px;'
+                          f'padding-left:18px">{items}</ul>')
     else:
         partes.append(_nota("<b>Esta semana no hay tarifas para COMPRAR ni OPORTUNIDADES.</b>"))
     vigentes = [a for a in d["res"].get("suprimidas", []) if a["nivel"] in ("COMPRAR", "OPORTUNIDAD")]
@@ -287,22 +326,25 @@ def armar_html(d: dict, prueba: bool = False) -> str:
         partes += [f'<p style="font-size:13px;font-weight:700;margin:8px 0 2px">Siguen vigentes '
                    f'(ya avisadas)</p><ul style="font-size:13px;margin:0 0 12px;padding-left:18px">'
                    f'{items}</ul>']
-    mv = cfg["mejor_tarifa_vista"]
-    partes.append(_nota(
-        f"Referencia a superar: {usd(mv['precio_usd'])} {_e(nombre(mv['ruta'], rutas_cfg))}, "
-        f"{_e(mv['aerolinea'])}, {fechas_txt(mv['fecha_ida'], mv['fecha_vuelta'])} "
-        f"(vista el {fmt_fecha(mv['fecha_busqueda'])}, sin valija). Umbrales COMPRAR: "
-        + ", ".join(f"{r} {usd(v, False)}" for r, v in cfg["umbrales_usd"].items()) + "."))
+    mv = cfg.get("mejor_tarifa_vista")
+    ref = (f"Referencia a superar: {usd(mv['precio_usd'])} {_e(nombre(mv['ruta'], rutas_cfg))}, "
+           f"{_e(mv['aerolinea'])}, {fechas_txt(mv['fecha_ida'], mv['fecha_vuelta'])} "
+           f"(vista el {fmt_fecha(mv['fecha_busqueda'])}). ") if mv else ""
+    partes.append(_nota(ref + "Umbrales COMPRAR (total con valija): "
+                        + ", ".join(f"{r} {usd(v, False)}" for r, v in cfg["umbrales_usd"].items())
+                        + "."))
 
     partes += [_titulo("Tarifas fechadas de esta semana"),
                tabla_fechadas_semana(obs, sem, rutas_cfg, cfg)]
     if any(a["nivel"] == "ATENCION" for a in alertas):
         partes += [_titulo("Atención"), lista_alertas(alertas, "ATENCION")]
-    partes += [_titulo("Carta de control · fechadas 13–16 días"),
+    viaje = rutas_cfg["viaje"]
+    partes += [_titulo(f"Carta de control · fechadas {viaje['estadia_min_dias']}–"
+                       f"{viaje['estadia_max_dias']} días"),
                _nota("Mejor total de cada semana. Límites μ ± 2σ con 6 semanas o más; antes se "
                      "muestra la banda de mercado. Las semanas sin dato no se interpolan."),
                tabla_control(d["tabla"], "fechada", rutas_cfg, cfg, banda),
-               _titulo("Índice de mercado · Turismocity, “desde” feb–mar 2027"),
+               _titulo(f"Índice de mercado · {_indice_txt(rutas_cfg)}"),
                _nota("Sólo tendencia: nunca dispara compras. Excluye fuentes no homogéneas."),
                tabla_control(d["tabla"], "indice", rutas_cfg, cfg, banda)]
 
@@ -345,7 +387,7 @@ def armar_texto(d: dict, prueba: bool = False) -> str:
     for r in d["tabla"][d["tabla"]["serie"] == "fechada"].itertuples():
         L.append(f"  {r.ruta} ({nombre(r.ruta, rutas_cfg)}): {usd(r.ultimo)} · {usd(r.minimo)} · "
                  f"{usd(r.media_4s)} · {r.tendencia}")
-    L += ["", "Índice (Turismocity): ruta · último · media 4s · tendencia"]
+    L += ["", f"Índice ({_indice_txt(d['rutas_cfg'])}): ruta · último · media 4s · tendencia"]
     for r in d["tabla"][d["tabla"]["serie"] == "indice"].itertuples():
         L.append(f"  {r.ruta}: {usd(r.ultimo)} · {usd(r.media_4s)} · {r.tendencia}")
     return "\n".join(L) + "\n"

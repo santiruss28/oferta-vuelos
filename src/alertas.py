@@ -294,8 +294,9 @@ def ejecutar(fecha: date, data_dir: Path = DATA, reports_dir: Path = REPORTS,
              config_dir: Path | None = None) -> dict:
     """Evalúa, escribe el JSON de la corrida y registra las alertas emitidas (no INFO)."""
     rutas_cfg, cfg = cargar_rutas(config_dir), cargar_alertas_cfg(config_dir)
-    obs = leer_observaciones(data_dir / OBSERVACIONES.name)
-    corridas = leer_csv(data_dir / CORRIDAS.name, COLUMNAS_CORRIDAS)
+    obs = control.vigentes(leer_observaciones(data_dir / OBSERVACIONES.name), rutas_cfg)
+    corridas = control.corridas_vigentes(leer_csv(data_dir / CORRIDAS.name, COLUMNAS_CORRIDAS),
+                                         rutas_cfg)
     emitidas = leer_csv(data_dir / ALERTAS_EMITIDAS.name, COLUMNAS_ALERTAS)
     res = evaluar(fecha, obs, corridas, emitidas, rutas_cfg, cfg,
                   contar_rechazadas(fecha, reports_dir))

@@ -1,14 +1,17 @@
 # oferta-vuelos
 
 Seguimiento semanal de precios de vuelos **Buenos Aires (EZE/AEP) → Europa**, ida y vuelta,
-estadía de 13 a 16 días (ideal 14), salida desde el **01/02/2027**.
+**14 días con equipaje, ida en junio–julio 2027** (ventana y grilla en `config/rutas.yaml`).
 
 - **Destinos principales:** París (PAR: CDG/ORY), Roma (ROM: FCO/CIA), Milán (MIL: MXP/LIN/BGY).
 - **Alternativas:** entrar por Madrid (MAD) o Barcelona (BCN) y conectar en low-cost a Francia/Italia.
-- **Referencia de mercado:** USD 900–1.500 en temporada baja. Mejor tarifa real vista: París
-  USD 726 (Air France, 24/04–08/05/2027, vista el 07/08/2026).
+- **Referencia de mercado (temporada alta europea):** USD 1.200–2.000 con valija. Muestra del
+  28/09/2026, mínimos de junio sin valija: París 1.318 · Roma 1.269 · Milán 1.275 · Madrid 1.075 ·
+  Barcelona 1.182 (julio, 150–500 más caro).
 
 Lo ejecuta una rutina programada de Claude Code una vez por semana (ver [ROUTINE.md](ROUTINE.md)).
+Los precios los busca `src/buscar.py` en Google Flights con un navegador headless, sobre una
+**grilla fija de fechas** (misma consulta todas las semanas): el modelo no transcribe precios.
 El resultado de cada corrida es **un mail semanal** que llega vía n8n.
 
 ## Principio de diseño
@@ -49,6 +52,7 @@ src/
   evaluar.py              CLI: evalúa una tarifa suelta contra el historial, sin guardar nada
   reporte.py              HTML + texto del mail semanal
   notificar.py            POST al webhook de n8n (reintentos, pendientes, prueba)
+  buscar.py               busca la grilla fija en Google Flights (Chromium headless) → entrada semanal
   corrida.py              orquesta la corrida completa en orden fijo
 tests/                    pytest con datos sintéticos
 ```
@@ -59,11 +63,13 @@ tests/                    pytest con datos sintéticos
 pip install -r requirements.txt
 python -m pytest -q                                          # tests
 
+python src/buscar.py                                         # busca la grilla → data/entrada/HOY.json
 python src/corrida.py --entrada data/entrada/2026-10-05.json # corrida semanal completa
 python src/corrida.py --entrada ... --sin-notificar --vista-previa /tmp/mail.html   # ver el mail sin mandarlo
 python src/evaluar.py PAR 790 2027-03-03 2027-03-17          # ¿está barata esta tarifa?
 python src/notificar.py --prueba                             # probar la integración con n8n
 python src/notificar.py --pendientes                         # reenviar sólo lo pendiente
+python src/buscar.py --rutas ROM --idas 2027-06-09           # probar el buscador en una búsqueda
 python src/importar_excel.py data/legado/historial-precios-consolidado.xlsx  # carga inicial (ya hecha)
 ```
 
@@ -87,16 +93,41 @@ python src/importar_excel.py data/legado/historial-precios-consolidado.xlsx  # c
 
 **Dos series por ruta:**
 
-- `indice`: precio "desde" de febrero y marzo 2027, **siempre de la misma fuente** (Turismocity,
-  configurable en `rutas.yaml`). Sirve para ver la tendencia del mercado. Nunca dispara compras.
-- `fechada`: ida y vuelta concretas de 13–16 días. Es **la única** que puede disparar COMPRAR/OPORTUNIDAD.
+- `indice`: por ruta y mes (junio, julio), **el mínimo de todas las búsquedas de la grilla fija
+  de ese mes** en Google Flights. Misma fuente y mismas consultas cada semana, así la serie es
+  comparable. Sirve para ver la tendencia del mercado. Nunca dispara compras.
+- `fechada`: ida y vuelta concretas (las 3 más baratas de cada búsqueda, una por aerolínea). Es
+  **la única** que puede disparar COMPRAR/OPORTUNIDAD.
+
+**Cambio de viaje:** el CSV guarda también las tarifas del viaje anterior (feb–abr 2027, índice
+de Turismocity). Las estadísticas, alertas y el mail sólo usan las del viaje actual: fechadas con
+ida dentro de `salida_desde`–`salida_hasta` e índice de los `meses_indice`. Turismocity quedó
+descartado porque bloquea el acceso automatizado (desafío anti-bot).
+
+### Búsqueda (`buscar.py`)
+
+- Grilla: idas los miércoles del 02/06 al 14/07/2027, 14 días de estadía, 5 rutas ≈ 35 búsquedas
+  (unos 10 minutos). Editable en `config/rutas.yaml → busqueda`.
+- Evidencia literal: el encabezado de la búsqueda ("salida el 2027-06-09 y vuelta el 2027-06-23")
+  más la descripción de la tarjeta ("A partir de 1318 dólares estadounidenses (precio total de ida
+  y vuelta). Vuelo directo con Air France. Sale de …").
+- Google Flights muestra la tarifa más básica: la valija se suma como recargo estimado
+  (`recargo_valija_usd`) y el mail lo marca como "valija est.". El filtro de equipaje de Google no
+  se puede pedir por URL.
+- Chromium no lee el CA del proxy del entorno: el script le indica confiar exactamente en las
+  claves de ese bundle (`--ignore-certificate-errors-spki-list`), sin desactivar la verificación TLS.
+- Una búsqueda sin resultados (o con menos de 3, que suele ser carga parcial) se reintenta una vez;
+  si falla, queda como fuente caída en el mail.
+- Ojo: los términos de uso de Google no permiten el acceso automatizado. Es un uso personal de
+  unas 35 consultas por semana, pero si Google empieza a mostrar captchas, las búsquedas van a
+  aparecer como caídas.
 
 ### Validación (`validar.py`)
 
 Una `fechada` se rechaza si: falta evidencia; las fechas o el precio no aparecen dentro de la
 evidencia (acepta `24/04`, `24 abr`, `24 de abril`, `Apr 24`, `US$ 1.020`, `$ 1.358.227`…);
-la estadía no es de 13–16 días; la ida es anterior al 01/02/2027; el precio es ≤ 0 o > 5.000.
-Un `indice` se rechaza si no viene de la fuente configurada o no es de feb/mar 2027.
+la estadía no es de 13–16 días; la ida cae fuera de la ventana del viaje; el precio es ≤ 0 o
+> 5.000. Un `indice` se rechaza si no viene de la fuente configurada o no es de un mes seguido.
 También se rechazan duplicados (serie, ruta, aerolínea, fechas, fuente y fecha de búsqueda).
 Todo lo rechazado va a `reports/rechazados_AAAA-MM-DD.csv` con el motivo.
 
@@ -117,12 +148,13 @@ Todo lo rechazado va a `reports/rechazados_AAAA-MM-DD.csv` con el motivo.
 
 Por ruta y por serie, sobre el **mejor `precio_total_usd` de cada semana ISO**:
 mínimo, promedio, mediana, desvío, último, n de semanas, media móvil de 4 semanas y racha de
-subas/bajas. Límites **μ ± 2σ sólo con ≥ 6 semanas**; antes se muestran la banda 900–1.500 y el
+subas/bajas. Límites **μ ± 2σ sólo con ≥ 6 semanas**; antes se muestran la banda de mercado y el
 umbral fijo. Las semanas sin dato quedan vacías (no se interpola) y se listan en el mail.
 
 ## Alertas (`alertas.py` + `config/alertas.yaml`)
 
-Umbrales fijos sobre el total con valija: **PAR 800 · ROM 850 · MIL 850 · MAD/BCN 850** (con conexión).
+Umbrales fijos sobre el total con valija: **PAR 1.200 · ROM 1.200 · MIL 1.200 · MAD/BCN 1.250**
+(con conexión). Calibrados con la muestra de junio–julio; editables en `config/alertas.yaml`.
 
 | Nivel | Regla | Condición |
 |---|---|---|
@@ -146,9 +178,9 @@ se puede pedir para cualquier tarifa que encuentres por tu cuenta con `src/evalu
 
 1. **Posición histórica**: qué % de las fechadas vistas para la ruta eran más caras.
 2. **Mínimo histórico y umbral**: a cuánto está de cada uno.
-3. **Carta de control**: debajo/dentro/encima de los límites (o de la banda 900–1.500 si todavía
+3. **Carta de control**: debajo/dentro/encima de los límites (o de la banda de mercado si todavía
    no hay 6 semanas).
-4. **Momento del mercado**: tendencia del índice de Turismocity (bajando → esperar puede convenir;
+4. **Momento del mercado**: tendencia del índice de la ruta (bajando → esperar puede convenir;
    subiendo → conviene decidir).
 5. **Días para la ida**.
 6. **Precio real**: valija (real o estimada) y conexión low-cost incluidas.
@@ -211,7 +243,8 @@ si hubo alertas de ese nivel.
 - 3 reintentos (2 s, 5 s, 10 s) ante error de red o 5xx. **No** reintenta ante 4xx.
 - Si falla, el payload queda en `data/notificaciones_pendientes.jsonl` y se reenvía **al inicio de
   la próxima corrida**, antes del nuevo. Cada intento se registra en `data/notificaciones.csv`.
-- Re-ejecutar la corrida del mismo día sin cambios no manda otro mail.
+- **Un mail por fecha:** re-ejecutar la corrida del mismo día sólo manda otro mail si aparece una
+  alerta COMPRAR u OPORTUNIDAD nueva (`--forzar-mail` para una re-ejecución manual).
 - Si faltan las variables de entorno, no falla: registra INFO "notificación no configurada".
 - El token nunca se escribe en logs ni archivos.
 
@@ -242,9 +275,7 @@ Import from File*). Después de importarlo, asigná las dos credenciales y tu ma
 Activá el workflow (URL de producción, no la de test) y probalo con
 `python src/notificar.py --prueba`: debería llegar un mail con asunto `[PRUEBA] …`.
 
-## Pendientes para Santiago
+## Tests
 
-1. Armar el workflow de n8n (arriba) y activarlo.
-2. Cargar `N8N_WEBHOOK_URL` y `N8N_WEBHOOK_TOKEN` en el entorno de la rutina.
-3. Probar: `python src/notificar.py --prueba`.
-4. Crear la rutina semanal con el prompt de [ROUTINE.md](ROUTINE.md).
+`python -m pytest -q`. Los tests usan su propia configuración fija (`tests/config/`), así que
+podés cambiar fechas, umbrales o la grilla en `config/` sin romperlos.

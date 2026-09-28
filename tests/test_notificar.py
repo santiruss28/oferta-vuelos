@@ -102,9 +102,21 @@ def test_reejecutar_el_mismo_dia_no_reenvia(env, dirs):
     post = Post(Resp(200), Resp(200))
     notificar.notificar_corrida(HOY, d, r, post=post, sleep=Sleep())
     assert notificar.notificar_corrida(HOY, d, r, post=post)["resultado"] == "ya_enviada"
+    # Cambió el contenido (otra INFO/ATENCIÓN) pero no hay destacadas nuevas: no reenvía.
+    preparar(dirs, [alerta(), alerta("ATENCION")])
+    assert notificar.notificar_corrida(HOY, d, r, post=post)["resultado"] == "ya_enviada"
     assert len(post.llamadas) == 1
-    preparar(dirs, [alerta(), alerta("OPORTUNIDAD", 850)])  # cambió el set de alertas
+    nueva = dict(alerta("OPORTUNIDAD", 850), alert_id="def")
+    preparar(dirs, [alerta(), nueva])  # apareció una OPORTUNIDAD nueva: reenvía
     assert notificar.notificar_corrida(HOY, d, r, post=post, sleep=Sleep())["resultado"] == "ok"
+
+
+def test_un_mail_por_fecha_aunque_no_haya_alertas(env, dirs):
+    d, r = preparar(dirs, [alerta("INFO")])
+    post = Post(Resp(200), Resp(200))
+    notificar.notificar_corrida(HOY, d, r, post=post, sleep=Sleep())
+    assert notificar.notificar_corrida(HOY, d, r, post=post)["resultado"] == "ya_enviada"
+    assert notificar.notificar_corrida(HOY, d, r, post=post, forzar=True)["resultado"] == "ok"
 
 
 def test_5xx_reintenta_con_backoff(env, dirs):
