@@ -1,2 +1,4 @@
 fecha_hora,tipo,fecha_corrida,resultado,status_http,intentos,detalle
 2026-09-28T02:33:16+00:00,semanal,2026-09-27,no_configurada,,0,notificación no configurada
+2026-09-28T03:16:26+00:00,semanal,2026-09-28,ok,200,1,firma=442dda5fb51c
+2026-09-28T03:16:59+00:00,semanal,2026-09-28,ok,200,1,firma=5fc268a55385
