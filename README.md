@@ -45,6 +45,8 @@ src/
   agregar.py              JSON de observaciones nuevas → valida → ARS→USD → append
   control.py              estadísticas y cartas de control
   alertas.py              reglas → reports/alertas_AAAA-MM-DD.json
+  contexto.py             contexto de precio de una tarifa (¿está barata?) y veredicto
+  evaluar.py              CLI: evalúa una tarifa suelta contra el historial, sin guardar nada
   reporte.py              HTML + texto del mail semanal
   notificar.py            POST al webhook de n8n (reintentos, pendientes, prueba)
   corrida.py              orquesta la corrida completa en orden fijo
@@ -59,6 +61,7 @@ python -m pytest -q                                          # tests
 
 python src/corrida.py --entrada data/entrada/2026-10-05.json # corrida semanal completa
 python src/corrida.py --entrada ... --sin-notificar --vista-previa /tmp/mail.html   # ver el mail sin mandarlo
+python src/evaluar.py PAR 790 2027-03-03 2027-03-17          # ¿está barata esta tarifa?
 python src/notificar.py --prueba                             # probar la integración con n8n
 python src/notificar.py --pendientes                         # reenviar sólo lo pendiente
 python src/importar_excel.py data/legado/historial-precios-consolidado.xlsx  # carga inicial (ya hecha)
@@ -136,12 +139,43 @@ Sólo se evalúan las fechadas de la semana de la corrida. **Anti-spam:** la mis
 Una tarifa ya avisada que sigue vigente aparece en el mail como "Siguen vigentes (ya avisadas)" y
 su fila sigue resaltada.
 
+## ¿Está barata? Contexto de precio
+
+Cada tarifa destacada en el mail trae un bloque **"¿Está barata? Contexto"**, y el mismo análisis
+se puede pedir para cualquier tarifa que encuentres por tu cuenta con `src/evaluar.py`:
+
+1. **Posición histórica**: qué % de las fechadas vistas para la ruta eran más caras.
+2. **Mínimo histórico y umbral**: a cuánto está de cada uno.
+3. **Carta de control**: debajo/dentro/encima de los límites (o de la banda 900–1.500 si todavía
+   no hay 6 semanas).
+4. **Momento del mercado**: tendencia del índice de Turismocity (bajando → esperar puede convenir;
+   subiendo → conviene decidir).
+5. **Días para la ida**.
+6. **Precio real**: valija (real o estimada) y conexión low-cost incluidas.
+7. **Alternativas**: la mejor MAD/BCN de la semana (o la mejor principal, si evaluás una alternativa).
+8. **Confiabilidad**: baja (< 4 semanas), media (4–5) o alta (≥ 6). Con confiabilidad baja,
+   manda el umbral fijo.
+
+```text
+$ python src/evaluar.py MAD 1300000 2027-02-11 2027-02-25 --moneda ARS --fx 1480
+⚪ PRECIO NORMAL  MAD · total USD 1.068
+   (tarifa USD 878 · con valija 948 (estimada) · + conexión 120)
+ · No es más barata que la única tarifa fechada vista para Madrid (1 semana con datos).
+ · USD 218 sobre el umbral de compra (USD 850); USD 6 sobre el mínimo histórico (USD 1.062).
+ · ...
+```
+
+Veredictos: **COMPRAR** y **OPORTUNIDAD** usan exactamente las reglas R1–R3 de las alertas
+(hay un test que lo verifica); **CARO** = sobre el UCL, en el percentil 80 o más, o sobre
+USD 1.500; **PRECIO NORMAL** = el resto. Opciones: `--moneda ARS --fx 1480`,
+`--incluye-valija si|no`, `--con-valija 890`. No escribe nada en `data/`.
+
 ## Mail semanal vía n8n
 
 Cada corrida hace **un POST** al webhook de n8n con el mail ya armado; n8n sólo lo envía.
 
 1. **Arriba:** si hay COMPRAR (rojo) u OPORTUNIDAD (naranja), un bloque grande por tarifa con
-   precio, ruta, fechas, aerolínea, diferencia con el umbral, mínimo histórico y link.
+   precio, ruta, fechas, aerolínea, desglose, link y su contexto de precio (ver arriba).
 2. Tarifas fechadas de la semana, con las filas baratas resaltadas y etiquetadas.
 3. ATENCIÓN.
 4. Carta de control de fechadas y del índice (tablas con ▲▼ y límites o banda).
