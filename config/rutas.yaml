@@ -1,0 +1,67 @@
+# Rutas seguidas: Buenos Aires (EZE/AEP) → Europa, ida y vuelta.
+# Editable. Si cambiás un costo de conexión o el recargo de valija, afecta sólo a
+# las filas nuevas: las ya guardadas conservan el valor con el que se registraron.
+
+origenes: [EZE, AEP]
+
+viaje:
+  estadia_min_dias: 13
+  estadia_max_dias: 16
+  estadia_ideal_dias: 14
+  # Ninguna ida fechada puede ser anterior a esta fecha.
+  salida_desde: "2027-02-01"
+  # Meses que sigue la serie índice (precio "desde" del mes).
+  meses_indice: ["2027-02", "2027-03"]
+  # Referencia de mercado EZE–Europa i/v en temporada baja (USD).
+  # Se muestra en la carta de control mientras una serie tenga < 6 semanas de datos.
+  banda_referencia_usd: [900, 1500]
+  # Rango de precio aceptado por validar.py (USD, por persona, i/v).
+  precio_min_usd: 0      # exclusivo: el precio debe ser > 0
+  precio_max_usd: 5000   # inclusivo
+  # Recargo estimado por valija despachada i/v cuando la tarifa no la incluye.
+  recargo_valija_usd: 70
+
+tipo_cambio:
+  # Cómo se convierte ARS → USD. La rutina registra en data/fx.csv el valor,
+  # el método y la fuente usados en cada corrida.
+  metodo: "oficial BNA vendedor"
+  fuente_sugerida: "https://www.bna.com.ar/Personas"
+
+rutas:
+  PAR:
+    nombre: París
+    categoria: principal
+    aeropuertos: [CDG, ORY]
+    costo_conexion_usd: 0
+    fuente_indice: Turismocity
+    url_indice: https://www.turismocity.com.ar/vuelos-baratos-a-PAR-paris
+  ROM:
+    nombre: Roma
+    categoria: principal
+    aeropuertos: [FCO, CIA]
+    costo_conexion_usd: 0
+    fuente_indice: Turismocity
+    url_indice: https://www.turismocity.com.ar/vuelos-baratos-a-ROM-roma
+  MIL:
+    nombre: Milán
+    categoria: principal
+    aeropuertos: [MXP, LIN, BGY]
+    costo_conexion_usd: 0
+    fuente_indice: Turismocity
+    url_indice: https://www.turismocity.com.ar/vuelos-baratos-a-MIL-milan
+  MAD:
+    nombre: Madrid (+ low-cost a Francia/Italia)
+    categoria: alternativa
+    aeropuertos: [MAD]
+    # Tramo low-cost MAD ↔ PAR/ROM/MIL, ida + vuelta, por persona.
+    # Observado: USD 50–190 según destino y fecha; se usa un valor medio.
+    costo_conexion_usd: 120
+    fuente_indice: Turismocity
+    url_indice: https://www.turismocity.com.ar/vuelos-baratos-a-MAD-madrid
+  BCN:
+    nombre: Barcelona (+ low-cost a Francia/Italia)
+    categoria: alternativa
+    aeropuertos: [BCN]
+    costo_conexion_usd: 120
+    fuente_indice: Turismocity
+    url_indice: https://www.turismocity.com.ar/vuelos-baratos-a-BCN-Barcelona
