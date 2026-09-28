@@ -5,7 +5,8 @@
 - Un POST por corrida, siempre (tipo "semanal"): el mail ES el reporte. El HTML lo arma
   src/reporte.py; si hay COMPRAR u OPORTUNIDAD, va destacado arriba y en el asunto.
 - Timeout 15 s; 3 reintentos (2 s, 5 s, 10 s) ante error de red o 5xx; 4xx no se reintenta.
-- Re-ejecutar la corrida del mismo día sin cambios no manda otro mail.
+- Un mail por fecha: re-ejecutar la corrida del mismo día sólo manda otro mail si aparece
+  una alerta COMPRAR u OPORTUNIDAD que no se había avisado.
 - Si falla, el payload queda en data/notificaciones_pendientes.jsonl y se reenvía al
   inicio de la próxima corrida. Cada intento se registra en data/notificaciones.csv.
 - El token nunca se escribe en logs ni archivos.
@@ -18,7 +19,6 @@ Uso:
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import os
 import sys
@@ -117,23 +117,32 @@ def guardar_pendiente(data_dir: Path, payload: dict) -> None:
     _escribir_pendientes(data_dir, resto + [payload])
 
 
-def firma(payload: dict) -> str:
-    """Identifica el contenido notificado: tipo + fecha + asunto + cuerpo."""
-    base = "|".join(str(payload.get(k, "")) for k in ("tipo", "fecha_corrida", "asunto", "html"))
-    return hashlib.sha1(base.encode()).hexdigest()[:12]
+def destacadas(payload: dict) -> list[str]:
+    """alert_id de las alertas COMPRAR/OPORTUNIDAD del payload."""
+    return sorted(a.get("alert_id", "") for a in payload.get("alertas", [])
+                  if a.get("nivel") in NIVELES_DESTACADOS)
 
 
 def ya_enviada(data_dir: Path, payload: dict) -> bool:
+    """Un mail por fecha: sólo se reenvía si aparece una alerta COMPRAR/OPORTUNIDAD nueva."""
     log = leer_csv(data_dir / NOTIFICACIONES.name, COLUMNAS_NOTIFICACIONES)
-    ok = log[(log["resultado"] == "ok") & (log["fecha_corrida"] == payload.get("fecha_corrida"))]
-    return ok["detalle"].str.contains(f"firma={firma(payload)}", regex=False).any()
+    ok = log[(log["resultado"] == "ok") & (log["tipo"] == payload.get("tipo"))
+             & (log["fecha_corrida"] == payload.get("fecha_corrida"))]
+    if ok.empty:
+        return False
+    avisadas = set()
+    for detalle in ok["detalle"]:
+        for parte in detalle.split(";"):
+            if parte.strip().startswith("destacadas="):
+                avisadas |= {x for x in parte.strip()[len("destacadas="):].split(",") if x}
+    return set(destacadas(payload)) <= avisadas
 
 
 def _enviar_y_registrar(payload: dict, cred, data_dir: Path, cfg: dict, **kw) -> dict:
     n = cfg.get("notificaciones", {})
     r = enviar(payload, *cred, timeout=n.get("timeout_s", 15),
                esperas=tuple(n.get("reintentos_s", (2, 5, 10))), **kw)
-    detalle = f"firma={firma(payload)}" + (f"; {r['detalle']}" if r["detalle"] else "")
+    detalle = f"destacadas={','.join(destacadas(payload))}" + (f"; {r['detalle']}" if r["detalle"] else "")
     registrar(data_dir, payload["tipo"], payload["fecha_corrida"], "ok" if r["ok"] else "error",
               r["status"], r["intentos"], detalle)
     return r
@@ -214,15 +223,15 @@ def _agregar_info(res_path: Path, res: dict, mensaje: str) -> None:
 
 
 def notificar_corrida(fecha: date, data_dir: Path = DATA, reports_dir: Path = REPORTS,
-                      config_dir: Path | None = None, **kw) -> dict:
+                      config_dir: Path | None = None, forzar: bool = False, **kw) -> dict:
     """Arma el mail semanal de la corrida y hace el POST (uno por corrida, siempre)."""
     res_path = reports_dir / f"alertas_{fecha.isoformat()}.json"
     res = json.loads(res_path.read_text(encoding="utf-8"))
     rutas_cfg, cfg = cargar_rutas(config_dir), cargar_alertas_cfg(config_dir)
     mail = reporte.generar(fecha, data_dir, reports_dir, config_dir)
     payload = construir_payload(TIPO, res, fecha, rutas_cfg, mail)
-    if ya_enviada(data_dir, payload):
-        # Re-ejecución del mismo día sin cambios: no se manda otro mail.
+    if not forzar and ya_enviada(data_dir, payload):
+        # Re-ejecución del mismo día sin alertas destacadas nuevas: no se manda otro mail.
         res["notificacion"] = {"tipo": TIPO, "resultado": "ya_enviada"}
         escribir_json(res_path, res)
         return res["notificacion"]
@@ -266,6 +275,7 @@ def main(argv=None) -> int:
     g.add_argument("--prueba", action="store_true", help="manda un payload de prueba")
     g.add_argument("--pendientes", action="store_true", help="sólo reenvía pendientes")
     p.add_argument("--fecha", default=date.today().isoformat(), help="AAAA-MM-DD (default hoy)")
+    p.add_argument("--forzar", action="store_true", help="manda aunque ya se haya mandado hoy")
     a = p.parse_args(argv)
     if a.prueba:
         r = prueba()
@@ -275,7 +285,7 @@ def main(argv=None) -> int:
     r = reenviar_pendientes()
     print(f"Pendientes reenviados: {r['reenviados']} · siguen pendientes: {r['siguen_pendientes']}")
     if not a.pendientes:
-        print("Notificación de la corrida:", notificar_corrida(a_fecha(a.fecha)))
+        print("Notificación de la corrida:", notificar_corrida(a_fecha(a.fecha), forzar=a.forzar))
     return 0
 
 

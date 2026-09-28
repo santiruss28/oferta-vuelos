@@ -236,8 +236,9 @@ def datos(fecha: date, data_dir: Path = DATA, reports_dir: Path = REPORTS,
           config_dir: Path | None = None) -> dict:
     """Carga todo lo necesario para el mail."""
     rutas_cfg, cfg = cargar_rutas(config_dir), cargar_alertas_cfg(config_dir)
-    obs = leer_observaciones(data_dir / OBSERVACIONES.name)
-    corridas = leer_csv(data_dir / CORRIDAS.name, COLUMNAS_CORRIDAS)
+    obs = control.vigentes(leer_observaciones(data_dir / OBSERVACIONES.name), rutas_cfg)
+    corridas = control.corridas_vigentes(leer_csv(data_dir / CORRIDAS.name, COLUMNAS_CORRIDAS),
+                                         rutas_cfg)
     fx = leer_csv(data_dir / FX.name, COLUMNAS_FX).sort_values("fecha")
     semanas = control.rango_de(obs, fecha, corridas)
     res_path = reports_dir / f"alertas_{fecha.isoformat()}.json"
@@ -248,6 +249,23 @@ def datos(fecha: date, data_dir: Path = DATA, reports_dir: Path = REPORTS,
         "sin_datos": control.semanas_sin_datos(obs, semanas, corridas),
         "res": json.loads(res_path.read_text(encoding="utf-8")) if res_path.exists() else {},
     }
+
+
+MESES_CORTOS = ("ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic")
+
+
+def _viaje_txt(rutas_cfg: dict) -> str:
+    v = rutas_cfg["viaje"]
+    txt = f"{v['estadia_ideal_dias']} días (se aceptan {v['estadia_min_dias']}–{v['estadia_max_dias']})"
+    if v.get("salida_hasta"):
+        return f"{txt}, ida entre el {fmt_fecha(v['salida_desde'])} y el {fmt_fecha(v['salida_hasta'])}"
+    return f"{txt}, salida desde el {fmt_fecha(v['salida_desde'])}"
+
+
+def _indice_txt(rutas_cfg: dict) -> str:
+    fuentes = sorted({r["fuente_indice"] for r in rutas_cfg["rutas"].values()})
+    meses = [f"{MESES_CORTOS[int(m[5:]) - 1]} {m[:4]}" for m in rutas_cfg["viaje"].get("meses_indice", [])]
+    return f"{' / '.join(fuentes)}, {'–'.join(meses)}"
 
 
 def contexto_de(a: dict, d: dict) -> dict:
@@ -266,7 +284,7 @@ def armar_html(d: dict, prueba: bool = False) -> str:
         f'<div style="font-family:Arial,Helvetica,sans-serif;color:{TEXTO};max-width:760px">',
         f'<h1 style="font-size:20px;margin:0 0 2px">Vuelos BUE → Europa · {fmt_fecha(fecha)}</h1>',
         _nota(f"Semana {sem}. Ida y vuelta EZE/AEP → París, Roma, Milán (o Madrid/Barcelona + "
-              "low-cost), 13–16 días, salida desde el 01/02/2027. Precios por persona; el "
+              f"low-cost), {_viaje_txt(rutas_cfg)}. Precios por persona; el "
               "<b>total</b> incluye valija (real o estimada) y, en alternativas, la conexión."),
     ]
     if prueba:
@@ -287,22 +305,25 @@ def armar_html(d: dict, prueba: bool = False) -> str:
         partes += [f'<p style="font-size:13px;font-weight:700;margin:8px 0 2px">Siguen vigentes '
                    f'(ya avisadas)</p><ul style="font-size:13px;margin:0 0 12px;padding-left:18px">'
                    f'{items}</ul>']
-    mv = cfg["mejor_tarifa_vista"]
-    partes.append(_nota(
-        f"Referencia a superar: {usd(mv['precio_usd'])} {_e(nombre(mv['ruta'], rutas_cfg))}, "
-        f"{_e(mv['aerolinea'])}, {fechas_txt(mv['fecha_ida'], mv['fecha_vuelta'])} "
-        f"(vista el {fmt_fecha(mv['fecha_busqueda'])}, sin valija). Umbrales COMPRAR: "
-        + ", ".join(f"{r} {usd(v, False)}" for r, v in cfg["umbrales_usd"].items()) + "."))
+    mv = cfg.get("mejor_tarifa_vista")
+    ref = (f"Referencia a superar: {usd(mv['precio_usd'])} {_e(nombre(mv['ruta'], rutas_cfg))}, "
+           f"{_e(mv['aerolinea'])}, {fechas_txt(mv['fecha_ida'], mv['fecha_vuelta'])} "
+           f"(vista el {fmt_fecha(mv['fecha_busqueda'])}). ") if mv else ""
+    partes.append(_nota(ref + "Umbrales COMPRAR (total con valija): "
+                        + ", ".join(f"{r} {usd(v, False)}" for r, v in cfg["umbrales_usd"].items())
+                        + "."))
 
     partes += [_titulo("Tarifas fechadas de esta semana"),
                tabla_fechadas_semana(obs, sem, rutas_cfg, cfg)]
     if any(a["nivel"] == "ATENCION" for a in alertas):
         partes += [_titulo("Atención"), lista_alertas(alertas, "ATENCION")]
-    partes += [_titulo("Carta de control · fechadas 13–16 días"),
+    viaje = rutas_cfg["viaje"]
+    partes += [_titulo(f"Carta de control · fechadas {viaje['estadia_min_dias']}–"
+                       f"{viaje['estadia_max_dias']} días"),
                _nota("Mejor total de cada semana. Límites μ ± 2σ con 6 semanas o más; antes se "
                      "muestra la banda de mercado. Las semanas sin dato no se interpolan."),
                tabla_control(d["tabla"], "fechada", rutas_cfg, cfg, banda),
-               _titulo("Índice de mercado · Turismocity, “desde” feb–mar 2027"),
+               _titulo(f"Índice de mercado · {_indice_txt(rutas_cfg)}"),
                _nota("Sólo tendencia: nunca dispara compras. Excluye fuentes no homogéneas."),
                tabla_control(d["tabla"], "indice", rutas_cfg, cfg, banda)]
 
@@ -345,7 +366,7 @@ def armar_texto(d: dict, prueba: bool = False) -> str:
     for r in d["tabla"][d["tabla"]["serie"] == "fechada"].itertuples():
         L.append(f"  {r.ruta} ({nombre(r.ruta, rutas_cfg)}): {usd(r.ultimo)} · {usd(r.minimo)} · "
                  f"{usd(r.media_4s)} · {r.tendencia}")
-    L += ["", "Índice (Turismocity): ruta · último · media 4s · tendencia"]
+    L += ["", f"Índice ({_indice_txt(d['rutas_cfg'])}): ruta · último · media 4s · tendencia"]
     for r in d["tabla"][d["tabla"]["serie"] == "indice"].itertuples():
         L.append(f"  {r.ruta}: {usd(r.ultimo)} · {usd(r.media_4s)} · {r.tendencia}")
     return "\n".join(L) + "\n"

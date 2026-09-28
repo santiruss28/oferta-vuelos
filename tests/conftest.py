@@ -1,12 +1,15 @@
 """Fixtures compartidas: datos sintéticos y directorios temporales."""
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 
 import pandas as pd
 import pytest
 
+# Config fija de los tests (independiente de config/, que es editable).
+os.environ["OFERTA_VUELOS_CONFIG"] = str(Path(__file__).resolve().parent / "config")
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
 from comun import COLUMNAS, cargar_alertas_cfg, cargar_rutas, semana_iso, tipar  # noqa: E402

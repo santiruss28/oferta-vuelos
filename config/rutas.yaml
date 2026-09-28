@@ -5,21 +5,38 @@
 origenes: [EZE, AEP]
 
 viaje:
-  estadia_min_dias: 13
+  # Viaje de junio–julio 2027, 14 días, con equipaje.
+  estadia_min_dias: 13   # tolerancia para tarifas cargadas a mano o con evaluar.py
   estadia_max_dias: 16
   estadia_ideal_dias: 14
-  # Ninguna ida fechada puede ser anterior a esta fecha.
-  salida_desde: "2027-02-01"
-  # Meses que sigue la serie índice (precio "desde" del mes).
-  meses_indice: ["2027-02", "2027-03"]
-  # Referencia de mercado EZE–Europa i/v en temporada baja (USD).
+  # Ventana de la ida: fuera de estas fechas validar.py rechaza la tarifa, y las
+  # estadísticas/alertas sólo usan tarifas con la ida dentro de la ventana.
+  salida_desde: "2027-06-01"
+  salida_hasta: "2027-07-31"
+  # Meses que sigue la serie índice (mínimo de la grilla fija de cada mes).
+  meses_indice: ["2027-06", "2027-07"]
+  # Desde cuándo cuentan las semanas del seguimiento de este viaje (las anteriores
+  # eran de otro viaje: quedan en el CSV pero no aparecen como semanas sin datos).
+  seguimiento_desde: "2026-09-28"
+  # Referencia de mercado EZE–Europa i/v en temporada alta europea (USD, con valija).
   # Se muestra en la carta de control mientras una serie tenga < 6 semanas de datos.
-  banda_referencia_usd: [900, 1500]
+  banda_referencia_usd: [1200, 2000]
   # Rango de precio aceptado por validar.py (USD, por persona, i/v).
   precio_min_usd: 0      # exclusivo: el precio debe ser > 0
   precio_max_usd: 5000   # inclusivo
-  # Recargo estimado por valija despachada i/v cuando la tarifa no la incluye.
+  # Recargo estimado por valija despachada i/v cuando la tarifa no la incluye
+  # (Google Flights muestra la tarifa más básica, normalmente sin valija).
   recargo_valija_usd: 70
+
+busqueda:
+  # Grilla fija que src/buscar.py consulta cada semana en Google Flights (sin IA).
+  # Misma grilla todas las semanas = serie comparable. 7 idas × 5 rutas ≈ 35 búsquedas.
+  fuente: Google Flights
+  estadia_dias: 14
+  idas: ["2027-06-02", "2027-06-09", "2027-06-16", "2027-06-23", "2027-06-30",
+         "2027-07-07", "2027-07-14"]
+  # Tarifas guardadas por búsqueda (la más barata de cada aerolínea, hasta N).
+  tarifas_por_busqueda: 3
 
 tipo_cambio:
   # Cómo se convierte ARS → USD. La rutina registra en data/fx.csv el valor,
@@ -30,38 +47,38 @@ tipo_cambio:
 rutas:
   PAR:
     nombre: París
+    consulta: "BUE to PAR"   # texto de búsqueda en Google Flights
     categoria: principal
     aeropuertos: [CDG, ORY]
     costo_conexion_usd: 0
-    fuente_indice: Turismocity
-    url_indice: https://www.turismocity.com.ar/vuelos-baratos-a-PAR-paris
+    fuente_indice: Google Flights (grilla fija)
   ROM:
     nombre: Roma
+    consulta: "BUE to ROM"   # texto de búsqueda en Google Flights
     categoria: principal
     aeropuertos: [FCO, CIA]
     costo_conexion_usd: 0
-    fuente_indice: Turismocity
-    url_indice: https://www.turismocity.com.ar/vuelos-baratos-a-ROM-roma
+    fuente_indice: Google Flights (grilla fija)
   MIL:
     nombre: Milán
+    consulta: "Buenos Aires to Milan"   # texto de búsqueda en Google Flights
     categoria: principal
     aeropuertos: [MXP, LIN, BGY]
     costo_conexion_usd: 0
-    fuente_indice: Turismocity
-    url_indice: https://www.turismocity.com.ar/vuelos-baratos-a-MIL-milan
+    fuente_indice: Google Flights (grilla fija)
   MAD:
     nombre: Madrid (+ low-cost a Francia/Italia)
+    consulta: "BUE to MAD"   # texto de búsqueda en Google Flights
     categoria: alternativa
     aeropuertos: [MAD]
     # Tramo low-cost MAD ↔ PAR/ROM/MIL, ida + vuelta, por persona.
     # Observado: USD 50–190 según destino y fecha; se usa un valor medio.
     costo_conexion_usd: 120
-    fuente_indice: Turismocity
-    url_indice: https://www.turismocity.com.ar/vuelos-baratos-a-MAD-madrid
+    fuente_indice: Google Flights (grilla fija)
   BCN:
     nombre: Barcelona (+ low-cost a Francia/Italia)
+    consulta: "BUE to BCN"   # texto de búsqueda en Google Flights
     categoria: alternativa
     aeropuertos: [BCN]
     costo_conexion_usd: 120
-    fuente_indice: Turismocity
-    url_indice: https://www.turismocity.com.ar/vuelos-baratos-a-BCN-Barcelona
+    fuente_indice: Google Flights (grilla fija)

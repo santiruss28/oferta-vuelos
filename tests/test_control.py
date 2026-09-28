@@ -76,3 +76,22 @@ def test_semanas_sin_datos(rutas_cfg):
     assert list(t[t["sin_ningun_dato"] == "si"]["semana_iso"]) == ["2026-W40"]
     w41 = t[t["semana_iso"] == "2026-W41"].iloc[0]
     assert "PAR" not in w41["rutas_sin_indice"] and "PAR" in w41["rutas_sin_fechada"]
+
+
+def test_vigentes_filtra_por_ventana_del_viaje(rutas_cfg):
+    from comun import COLUMNAS_CORRIDAS
+    cfg = {**rutas_cfg, "viaje": {**rutas_cfg["viaje"], "salida_desde": "2027-06-01",
+                                  "salida_hasta": "2027-07-31", "meses_indice": ["2027-06"],
+                                  "seguimiento_desde": "2026-09-28"}}
+    obs = df([
+        fila(rutas_cfg, fecha_ida="2027-03-03", fecha_vuelta="2027-03-17"),   # viaje anterior
+        fila(rutas_cfg, fecha_ida="2027-06-09", fecha_vuelta="2027-06-23"),
+        fila(rutas_cfg, fecha_ida="2027-08-04", fecha_vuelta="2027-08-18"),   # fuera de la ventana
+        fila(rutas_cfg, serie="indice", fuente="Turismocity", fecha_ida="2027-06-09", fecha_vuelta="",
+             evidencia=""),
+        indice(rutas_cfg, "2026-10-05", 900),                                  # índice de feb
+    ])
+    v = control.vigentes(obs, cfg)
+    assert sorted(v["fecha_ida"]) == ["2027-06-09", "2027-06-09"]
+    corr = pd.DataFrame([{"fecha": "2026-09-27"}, {"fecha": "2026-10-05"}], columns=COLUMNAS_CORRIDAS)
+    assert list(control.corridas_vigentes(corr, cfg)["fecha"]) == ["2026-10-05"]

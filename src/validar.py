@@ -4,7 +4,8 @@ Reglas (todas deterministas; el modelo nunca decide si un dato es válido):
 - Esquema: ruta, serie, moneda, incluye_valija, fechas y precios con formato válido.
 - Precio: > 0 y <= precio_max_usd (default 5000).
 - Serie fechada: evidencia obligatoria y las fechas de ida/vuelta y el precio tienen
-  que aparecer literalmente en la evidencia; estadía 13–16 días; ida >= salida_desde.
+  que aparecer literalmente en la evidencia; estadía 13–16 días; ida dentro de la
+  ventana salida_desde–salida_hasta de config/rutas.yaml.
 - Serie índice: siempre de la fuente configurada para la ruta y de un mes seguido.
 - Duplicados: misma serie, ruta, aerolínea, fechas, fuente y fecha_busqueda.
 - Las filas importadas (origen_dato=importado_sin_evidencia) quedan exceptuadas de
@@ -179,8 +180,11 @@ def validar_fila(f: dict, rutas_cfg: dict) -> list[str]:
             motivos.append("fechada sin fecha_ida/fecha_vuelta AAAA-MM-DD")
         else:
             desde = a_fecha(viaje["salida_desde"])
+            hasta = a_fecha(viaje.get("salida_hasta"))
             if ida < desde:
                 motivos.append(f"fecha_ida {ida} anterior a {desde}")
+            if hasta and ida > hasta:
+                motivos.append(f"fecha_ida {ida} posterior a {hasta}")
             dias = (vuelta - ida).days
             dmin, dmax = viaje["estadia_min_dias"], viaje["estadia_max_dias"]
             if not dmin <= dias <= dmax:

@@ -1,7 +1,8 @@
 """Estadísticas y cartas de control por ruta y por serie.
 
 La serie de control de cada ruta es el MEJOR precio_total_usd de cada semana ISO.
-Las semanas sin dato quedan vacías (NaN): no se interpola. Las filas del índice
+Las semanas sin dato quedan vacías (NaN): no se interpola. Sólo cuentan las tarifas
+del viaje actual (ver `vigentes`). Las filas del índice
 marcadas como "fuente no homogénea" se excluyen de la serie índice (rachas y límites).
 
 Límites de control μ ± k·σ sólo con n_semanas >= min_semanas_limites (default 6);
@@ -24,6 +25,25 @@ def filtrar_serie(obs: pd.DataFrame, ruta: str, serie: str) -> pd.DataFrame:
     if serie == "indice":
         d = d[~d["notas"].fillna("").str.contains(NOTA_NO_HOMOGENEA, regex=False)]
     return d.dropna(subset=["precio_total_usd"])
+
+
+def vigentes(obs: pd.DataFrame, rutas_cfg: dict) -> pd.DataFrame:
+    """Sólo las tarifas del viaje actual (el CSV guarda también las de viajes anteriores).
+
+    Fechadas: ida dentro de salida_desde–salida_hasta. Índice: ida en meses_indice.
+    """
+    viaje = rutas_cfg["viaje"]
+    desde, hasta = viaje["salida_desde"], viaje.get("salida_hasta") or "9999-12-31"
+    ida = obs["fecha_ida"].fillna("").astype(str)
+    fechada = (obs["serie"] == "fechada") & (ida >= desde) & (ida <= hasta)
+    indice = (obs["serie"] == "indice") & ida.str[:7].isin(viaje.get("meses_indice", []))
+    return obs[fechada | indice]
+
+
+def corridas_vigentes(corridas: pd.DataFrame, rutas_cfg: dict) -> pd.DataFrame:
+    """Corridas desde que empezó el seguimiento del viaje actual."""
+    desde = rutas_cfg["viaje"].get("seguimiento_desde") or ""
+    return corridas[corridas["fecha"] >= desde]
 
 
 def rango_de(obs: pd.DataFrame, hasta, corridas: pd.DataFrame | None = None) -> list[str]:
