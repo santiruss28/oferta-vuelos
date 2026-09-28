@@ -23,6 +23,7 @@ from comun import (COLUMNAS_CORRIDAS, COLUMNAS_FX, CORRIDAS, DATA, ETIQUETA, FX,
                    IMPORTADO_SIN_EVIDENCIA, OBSERVACIONES, REPORTS, a_fecha,
                    cargar_alertas_cfg, cargar_rutas, fmt_fecha, leer_csv, leer_observaciones,
                    semana_iso)
+from contexto import contexto
 
 # Colores: tinta de texto neutra; rojo/naranja/amarillo reservados para estados, siempre
 # acompañados de su etiqueta.
@@ -112,8 +113,8 @@ def _chip(nivel: str) -> str:
             f'{ETIQUETA[nivel]}</span>')
 
 
-def bloque_destacado(a: dict, rutas_cfg: dict) -> str:
-    """Tarjeta grande para una alerta COMPRAR u OPORTUNIDAD."""
+def bloque_destacado(a: dict, rutas_cfg: dict, ctx: dict | None = None) -> str:
+    """Tarjeta grande para una alerta COMPRAR u OPORTUNIDAD, con su contexto de precio."""
     c = ESTADO[a["nivel"]]
     total, umbral, minimo = a.get("precio_total_usd"), a.get("umbral_usd"), a.get("minimo_historico_usd")
     detalles = []
@@ -141,10 +142,21 @@ def bloque_destacado(a: dict, rutas_cfg: dict) -> str:
         f'<span style="font-size:16px;font-weight:400">· {_e(nombre(a["ruta"], rutas_cfg))}</span></div>'
         f'<div style="font-size:14px;color:{TEXTO}">{fechas_txt(a["fecha_ida"], a["fecha_vuelta"])}'
         f' · {_e(a.get("dias"))} días · {_e(a.get("aerolinea") or "s/aerolínea")}</div>'
-        f'<div style="font-size:13px;color:{TEXTO_2};margin-top:6px">{" · ".join(detalles)}</div>'
-        f'<div style="font-size:12px;color:{TEXTO_2};margin-top:2px">{" · ".join(desglose)} · '
+        + ("" if ctx else f'<div style="font-size:13px;color:{TEXTO_2};margin-top:6px">'
+                          f'{" · ".join(detalles)}</div>') +
+        f'<div style="font-size:12px;color:{TEXTO_2};margin-top:4px">{" · ".join(desglose)} · '
         f'{_e(a.get("fuente"))}{link}</div>'
+        + _contexto_html(ctx) +
         "</td></tr></table>")
+
+
+def _contexto_html(ctx: dict | None) -> str:
+    if not ctx:
+        return ""
+    lis = "".join(f'<li style="margin:1px 0">{_e(x)}</li>' for x in ctx["lineas"])
+    return (f'<div style="font-size:12px;font-weight:700;color:{TEXTO};margin-top:10px">'
+            f'¿Está barata? Contexto</div>'
+            f'<ul style="font-size:12px;color:{TEXTO};margin:2px 0 0;padding-left:18px">{lis}</ul>')
 
 
 def tabla_fechadas_semana(obs, sem, rutas_cfg, cfg) -> str:
@@ -238,6 +250,13 @@ def datos(fecha: date, data_dir: Path = DATA, reports_dir: Path = REPORTS,
     }
 
 
+def contexto_de(a: dict, d: dict) -> dict:
+    """Contexto de precio de una alerta, contra el historial de semanas anteriores."""
+    return contexto(d["obs"], a["ruta"], a["precio_total_usd"], d["fecha"], d["rutas_cfg"], d["cfg"],
+                    fecha_ida=a.get("fecha_ida"), valija_estimada=bool(a.get("valija_estimada")),
+                    costo_conexion=a.get("costo_conexion_usd") or 0)
+
+
 def armar_html(d: dict, prueba: bool = False) -> str:
     fecha, rutas_cfg, cfg, obs = d["fecha"], d["rutas_cfg"], d["cfg"], d["obs"]
     sem = semana_iso(fecha)
@@ -256,7 +275,7 @@ def armar_html(d: dict, prueba: bool = False) -> str:
 
     destacadas = [a for a in alertas if a["nivel"] in ("COMPRAR", "OPORTUNIDAD")]
     if destacadas:
-        partes += [bloque_destacado(a, rutas_cfg) for a in destacadas]
+        partes += [bloque_destacado(a, rutas_cfg, contexto_de(a, d)) for a in destacadas]
     else:
         partes.append(_nota("<b>Esta semana no hay tarifas para COMPRAR ni OPORTUNIDADES.</b>"))
     vigentes = [a for a in d["res"].get("suprimidas", []) if a["nivel"] in ("COMPRAR", "OPORTUNIDAD")]
@@ -318,6 +337,8 @@ def armar_texto(d: dict, prueba: bool = False) -> str:
     for nivel in ("COMPRAR", "OPORTUNIDAD", "ATENCION"):
         for a in (x for x in alertas if x["nivel"] == nivel):
             L.append(f"[{ETIQUETA[nivel]}] {a['mensaje']}" + (f" {a['url']}" if a.get("url") else ""))
+            if nivel != "ATENCION":
+                L += [f"    · {x}" for x in contexto_de(a, d)["lineas"]]
     if not any(a["nivel"] in ("COMPRAR", "OPORTUNIDAD") for a in alertas):
         L.append("Sin tarifas para COMPRAR ni OPORTUNIDADES esta semana.")
     L += ["", "Carta de control (fechadas): ruta · último · mín · media 4s · tendencia"]

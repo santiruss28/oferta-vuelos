@@ -32,7 +32,7 @@ def test_tarifa_barata_destacada_arriba_y_en_la_tabla(rutas_cfg, dirs):
     bloque = h.index("font-size:28px")
     assert bloque < h.index("Tarifas fechadas de esta semana")
     assert "USD 780" in h[bloque:bloque + 200] and "Ver tarifa" in h
-    assert "USD 20 bajo el umbral (USD 800)" in h
+    assert "USD 20 bajo el umbral de compra (USD 800)" in h
     # Fila resaltada con fondo y etiqueta; la de Roma (cara) no.
     tabla = h[h.index("Tarifas fechadas de esta semana"):h.index("Carta de control")]
     assert tabla.count("#fdecea") >= 1 and ">COMPRAR</span>" in tabla
@@ -91,3 +91,13 @@ def test_html_escapa_texto_externo(rutas_cfg, dirs):
     d, r = dirs
     guardar(d, [fechada(rutas_cfg, 1300, aerolinea="<script>x</script>")])
     assert "<script>" not in mail(d, r)["html"]
+
+
+def test_destacado_incluye_contexto_de_precio(rutas_cfg, dirs):
+    d, r = dirs
+    guardar(d, [fechada(rutas_cfg, 1000, fecha_busqueda=lunes(1)), fechada(rutas_cfg, 780)])
+    m = mail(d, r)
+    assert "¿Está barata? Contexto" in m["html"]
+    assert "Más barata que la única tarifa fechada vista para París" in m["html"]
+    assert "Confiabilidad baja" in m["html"]
+    assert "    · Más barata que la única" in m["texto"]
