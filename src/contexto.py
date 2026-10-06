@@ -5,7 +5,7 @@ suelta que encontraste vos). Todo sale de data/observaciones.csv con reglas fija
 
 1. Posición histórica: qué % de las fechadas vistas para la ruta eran más caras.
 2. Contra el mínimo histórico y el umbral fijo de la ruta.
-3. Momento del mercado: tendencia del índice (Turismocity) de la ruta.
+3. Momento del mercado: tendencia del índice de la ruta (fuente de config/rutas.yaml).
 4. Días que faltan para la ida.
 5. Precio real: valija (real o estimada) y conexión low-cost incluidas.
 6. Contra las alternativas (o las principales) de la misma semana.

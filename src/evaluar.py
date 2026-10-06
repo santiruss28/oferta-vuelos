@@ -16,6 +16,7 @@ import argparse
 import sys
 from datetime import date
 
+import control
 from comun import RUTAS, a_fecha, cargar_alertas_cfg, cargar_rutas, leer_observaciones
 from contexto import contexto
 from validar import completar
@@ -29,7 +30,7 @@ def evaluar(ruta: str, precio: float, ida=None, vuelta=None, moneda="USD", fx=No
             obs=None, rutas_cfg=None, cfg=None) -> dict:
     rutas_cfg = rutas_cfg or cargar_rutas()
     cfg = cfg or cargar_alertas_cfg()
-    obs = leer_observaciones() if obs is None else obs
+    obs = control.vigentes(leer_observaciones() if obs is None else obs, rutas_cfg)
     fecha = fecha or date.today()
     if moneda == "ARS":
         if not fx:
@@ -49,6 +50,8 @@ def evaluar(ruta: str, precio: float, ida=None, vuelta=None, moneda="USD", fx=No
                       f"{viaje['estadia_min_dias']}–{viaje['estadia_max_dias']}): no es comparable.")
     if di and di < a_fecha(viaje["salida_desde"]):
         avisos.append(f"La ida es anterior al {viaje['salida_desde']}.")
+    if di and viaje.get("salida_hasta") and di > a_fecha(viaje["salida_hasta"]):
+        avisos.append(f"La ida es posterior al {viaje['salida_hasta']}.")
     ctx = contexto(obs, ruta, f["precio_total_usd"], fecha, rutas_cfg, cfg, fecha_ida=ida,
                    incluir_semana=True, valija_estimada=f.get("valija_estimada") == "si",
                    costo_conexion=f.get("costo_conexion_usd") or 0)

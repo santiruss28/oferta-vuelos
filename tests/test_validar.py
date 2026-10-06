@@ -173,3 +173,9 @@ def test_el_ejemplo_de_entrada_de_la_documentacion_es_valido(dirs):
     ejemplo = Path(__file__).resolve().parent.parent / "docs" / "entrada-ejemplo.json"
     res = agregar.agregar(json.loads(ejemplo.read_text(encoding="utf-8")), None, d, r)
     assert res["filas_rechazadas"] == 0 and res["filas_agregadas"] == 3
+
+
+def test_ida_posterior_a_la_ventana(rutas_cfg):
+    cfg = {**rutas_cfg, "viaje": {**rutas_cfg["viaje"], "salida_hasta": "2027-03-01"}}
+    f = fila(cfg)
+    assert any("posterior a 2027-03-01" in m for m in validar_fila(f, cfg))

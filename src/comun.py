@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import os
 from datetime import date, datetime
 from pathlib import Path
 
@@ -10,7 +11,8 @@ import yaml
 
 RAIZ = Path(__file__).resolve().parent.parent
 DATA = RAIZ / "data"
-CONFIG = RAIZ / "config"
+# OFERTA_VUELOS_CONFIG permite usar otra carpeta de config (los tests usan tests/config).
+CONFIG = Path(os.environ.get("OFERTA_VUELOS_CONFIG", RAIZ / "config"))
 REPORTS = RAIZ / "reports"
 
 OBSERVACIONES = DATA / "observaciones.csv"

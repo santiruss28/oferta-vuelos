@@ -101,3 +101,17 @@ def test_destacado_incluye_contexto_de_precio(rutas_cfg, dirs):
     assert "Más barata que la única tarifa fechada vista para París" in m["html"]
     assert "Confiabilidad baja" in m["html"]
     assert "    · Más barata que la única" in m["texto"]
+
+
+def test_un_bloque_grande_por_ruta_y_tabla_acotada(rutas_cfg, dirs):
+    d, r = dirs
+    filas = [fila(rutas_cfg, fecha_busqueda="2026-10-05", precio_moneda_original=p, incluye_valija="si",
+                  aerolinea=f"Aero{i}", evidencia=f"3 mar – 17 mar US${p}")
+             for i, p in enumerate([780, 790, 1300, 1400, 1500, 1600])]
+    guardar(d, filas)
+    h = mail(d, r)["html"]
+    assert h.count("font-size:28px") == 1                    # un solo bloque grande para París
+    assert "Otras tarifas destacadas" in h and "USD 790" in h
+    tabla = h[h.index("Tarifas fechadas de esta semana"):h.index("Carta de control")]
+    assert tabla.count("<tr>") == 1 + 3                      # encabezado + 3 más baratas
+    assert "3 tarifa(s) más de esta semana" in tabla

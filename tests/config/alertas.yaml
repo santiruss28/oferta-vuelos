@@ -1,20 +1,25 @@
+# Config FIJA de los tests (no editar para ajustar el viaje: eso va en config/).
 # Umbrales del sistema de alertas. Todos editables.
 # Niveles: COMPRAR > OPORTUNIDAD > ATENCION > INFO.
 # Sólo la serie "fechada" puede disparar COMPRAR/OPORTUNIDAD; la serie "indice" nunca.
 # Las filas importadas sin evidencia cuentan para el historial pero no disparan alertas.
 
 # Umbral fijo por ruta sobre precio_total_usd (con valija; MAD/BCN incluyen la conexión low-cost).
-# Calibrados para junio–julio 2027 con la muestra de Google Flights del 28/09/2026
-# (mínimos de junio sin valija: PAR 1.318, ROM 1.269, MIL 1.275, MAD 1.075, BCN 1.182).
 umbrales_usd:
-  PAR: 1200
-  ROM: 1200
-  MIL: 1200
-  MAD: 1250
-  BCN: 1250
+  PAR: 800
+  ROM: 850
+  MIL: 850
+  MAD: 850
+  BCN: 850
 
-# Mejor tarifa real vista para ESTE viaje (referencia a superar; opcional, sólo informativa).
-mejor_tarifa_vista: null
+# Mejor tarifa real vista hasta ahora: la referencia a superar (sólo informativa en el reporte).
+mejor_tarifa_vista:
+  ruta: PAR
+  precio_usd: 726
+  aerolinea: Air France
+  fecha_ida: "2027-04-24"
+  fecha_vuelta: "2027-05-08"
+  fecha_busqueda: "2026-08-07"
 
 control:
   k_sigma: 2
