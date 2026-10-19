@@ -1,2 +1,3 @@
 fecha_emision,alert_id,nivel,regla,ruta,fecha_ida,fecha_vuelta,precio_total_usd
 2026-10-12,cb282913f92b5bb4f7b36b1455145e6b83e95f80,OPORTUNIDAD,R3_cerca_umbral,ROM,2027-06-23,2027-07-07,1270.0
+2026-10-19,83d33879672a01b0c11844fa485dd45eead39351,OPORTUNIDAD,R3_cerca_umbral,BCN,2027-06-02,2027-06-16,1335.0
