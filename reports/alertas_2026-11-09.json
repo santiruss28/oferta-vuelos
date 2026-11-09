@@ -1,0 +1,94 @@
+{
+  "fecha_corrida": "2026-11-09",
+  "semana_iso": "2026-W46",
+  "alertas": [
+    {
+      "alert_id": "0c19bc52d5a2733897a0e1b89ed4d4cd625acd9a",
+      "nivel": "INFO",
+      "regla": "R7_notificacion",
+      "ruta": "",
+      "aerolinea": "",
+      "fecha_ida": "",
+      "fecha_vuelta": "",
+      "dias": null,
+      "precio_usd": null,
+      "precio_con_valija_usd": null,
+      "valija_estimada": null,
+      "costo_conexion_usd": null,
+      "precio_total_usd": null,
+      "umbral_usd": null,
+      "minimo_historico_usd": null,
+      "fuente": "",
+      "url": "",
+      "evidencia": "",
+      "mensaje": "falló el envío del mail semanal (HTTP 403); queda pendiente para la próxima corrida"
+    }
+  ],
+  "suprimidas": [
+    {
+      "alert_id": "e424caa7eb56504ca4d7a90a71a1924aa2b20ec3",
+      "nivel": "OPORTUNIDAD",
+      "regla": "R3_cerca_umbral",
+      "ruta": "BCN",
+      "aerolinea": "Air France",
+      "fecha_ida": "2027-06-02",
+      "fecha_vuelta": "2027-06-16",
+      "dias": 14,
+      "precio_usd": 1144.0,
+      "precio_con_valija_usd": 1214.0,
+      "valija_estimada": true,
+      "costo_conexion_usd": 120,
+      "precio_total_usd": 1334.0,
+      "umbral_usd": 1250,
+      "minimo_historico_usd": 1274.0,
+      "fuente": "Google Flights",
+      "url": "https://www.google.com/travel/flights?q=Flights+from+BUE+to+BCN+on+2027-06-02+through+2027-06-16&hl=es&curr=USD",
+      "evidencia": "salida el 2027-06-02 y vuelta el 2027-06-16 … A partir de 1144 dólares estadounidenses (precio total de ida y vuelta). Vuelo con 1 escala de Air France. Sale de Aeropuerto Internacional Ezeiza el miércoles, junio 2 a las 0:20. Llega a Aeropuerto Josep Tarradellas Barcelona-El Prat el miércoles, junio 2 a las 22:45. Duración total: 17 h 25 min. Esta escala (1 de 1) es una escala de 2 h 40 min en Aeropuerto de París-Charles de Gaulle de París. Seleccionar vuelo",
+      "mensaje": "Barcelona (+ low-cost a Francia/Italia) USD 1.334 – 02/06/2027→16/06/2027 – Air France: a menos de 8% del umbral USD 1.250",
+      "motivo_supresion": "ya emitida el 2026-10-26 a USD 1.274"
+    }
+  ],
+  "resumen_indice": [
+    {
+      "ruta": "PAR",
+      "ultimo": 1345.0,
+      "semana_ultimo": "2026-W46",
+      "media_4s": 1362.5,
+      "tendencia": "estable"
+    },
+    {
+      "ruta": "ROM",
+      "ultimo": 1313.0,
+      "semana_ultimo": "2026-W46",
+      "media_4s": 1295.25,
+      "tendencia": "sube"
+    },
+    {
+      "ruta": "MIL",
+      "ultimo": 1331.0,
+      "semana_ultimo": "2026-W46",
+      "media_4s": 1292.0,
+      "tendencia": "sube"
+    },
+    {
+      "ruta": "MAD",
+      "ultimo": 1399.0,
+      "semana_ultimo": "2026-W46",
+      "media_4s": 1370.25,
+      "tendencia": "sube"
+    },
+    {
+      "ruta": "BCN",
+      "ultimo": 1334.0,
+      "semana_ultimo": "2026-W46",
+      "media_4s": 1323.5,
+      "tendencia": "estable"
+    }
+  ],
+  "notificacion": {
+    "tipo": "semanal",
+    "resultado": "pendiente",
+    "status_http": 403,
+    "intentos": 1
+  }
+}
